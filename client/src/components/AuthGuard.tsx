@@ -8,9 +8,50 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { clearWorkoutLogsByUser, getWorkoutLogsByUser } from "@/lib/workoutStorage";
 import Login from "@/pages/Login";
-import { LogOut, Trash2, UserCog, UserPlus } from "lucide-react";
+import { DatabaseBackup, LogOut, Trash2, UserCog, UserPlus } from "lucide-react";
 import { useState } from "react";
+
+function ClearHistoryButton({ userId }: { userId: string }) {
+  const count = getWorkoutLogsByUser(userId).length;
+  const [confirming, setConfirming] = useState(false);
+
+  if (count === 0) return null;
+
+  return confirming ? (
+    <span className="flex items-center gap-1">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        title="Confirmar borrado"
+        onClick={() => { clearWorkoutLogsByUser(userId); setConfirming(false); }}
+        className="text-red-600 hover:text-red-800 hover:bg-red-50"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        title="Cancelar"
+        onClick={() => setConfirming(false)}
+        className="text-zinc-400 hover:text-zinc-600"
+      >
+        ✕
+      </Button>
+    </span>
+  ) : (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      title={`Borrar historial (${count} sesión${count !== 1 ? "es" : ""})`}
+      onClick={() => setConfirming(true)}
+      className="text-amber-500 hover:text-amber-700 hover:bg-amber-50"
+    >
+      <DatabaseBackup className="w-3.5 h-3.5" />
+    </Button>
+  );
+}
 
 function UserManagementDialog() {
   const { users, currentUser, addUser, removeUser, changePassword } = useAuth();
@@ -98,6 +139,7 @@ function UserManagementDialog() {
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                 </Button>
+                <ClearHistoryButton userId={u} />
                 {u !== "admin" && (
                   <Button
                     variant="ghost"

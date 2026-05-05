@@ -64,3 +64,8 @@ export function getWorkoutLogsByUser(userId: string): WorkoutLog[] {
 export function getAllWorkoutLogs(): WorkoutLog[] {
   return loadLogs();
 }
+
+export function clearWorkoutLogsByUser(userId: string): void {
+  const remaining = loadLogs().filter((l) => l.userId !== userId);
+  persistLogs(remaining);
+}
