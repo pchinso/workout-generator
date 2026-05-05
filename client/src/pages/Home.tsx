@@ -5,9 +5,9 @@
 */
 
 import { useMemo, useState } from "react";
-import { ClipboardList, Dice5, Dumbbell, ExternalLink, RotateCcw, Save, Sparkles } from "lucide-react";
+import { ClipboardList, Dice5, Download, Dumbbell, ExternalLink, RotateCcw, Save, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { saveWorkoutLog, type ExerciseLog } from "@/lib/workoutStorage";
+import { getAllWorkoutLogs, saveWorkoutLog, type ExerciseLog } from "@/lib/workoutStorage";
 import { useAuth } from "@/contexts/AuthContext";
 
 type RoutineType = "Full Body" | "Push" | "Pull" | "Legs";
@@ -415,6 +415,42 @@ export default function Home() {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
   };
 
+  const handleDownloadCsv = () => {
+    const logs = getAllWorkoutLogs();
+    if (logs.length === 0) {
+      toast.info("No hay entrenamientos guardados aún.");
+      return;
+    }
+    const header = ["id", "usuario", "fecha", "sesion_id", "tipo", "dia", "enfoque", "ejercicio", "peso", "series", "reps", "rir"];
+    const rowsCsv: string[] = [];
+    for (const log of logs) {
+      for (const ex of log.exercises) {
+        rowsCsv.push([
+          log.id,
+          log.userId,
+          log.date,
+          log.sessionId,
+          log.sessionType,
+          log.sessionDay,
+          log.sessionFocus,
+          ex.name,
+          ex.peso,
+          ex.series,
+          ex.reps,
+          ex.rir,
+        ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","));
+      }
+    }
+    const csv = [header.join(","), ...rowsCsv].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `entrenamientos_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleSave = () => {
     if (!selected) return;
     const userId = currentUser ?? "anonymous";
@@ -484,6 +520,7 @@ export default function Home() {
             <div className="action-row">
               <button onClick={resetFields} className="ghost-button"><RotateCcw size={17} /> Limpiar</button>
               <button onClick={handleSave} className="ghost-button save-button" disabled={!selected}><Save size={17} /> Guardar entrenamiento</button>
+              <button onClick={handleDownloadCsv} className="ghost-button"><Download size={17} /> Descargar CSV</button>
             </div>
           </div>
 
