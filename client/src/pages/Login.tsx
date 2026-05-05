@@ -65,7 +65,6 @@ export default function Login() {
               autoFocus
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin"
               className="border-zinc-300 focus:border-zinc-900"
             />
           </div>
@@ -79,7 +78,6 @@ export default function Login() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
               className="border-zinc-300 focus:border-zinc-900"
             />
           </div>
