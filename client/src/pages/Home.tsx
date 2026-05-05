@@ -5,7 +5,10 @@
 */
 
 import { useMemo, useState } from "react";
-import { ClipboardList, Dice5, Dumbbell, ExternalLink, Printer, RotateCcw, Sparkles } from "lucide-react";
+import { ClipboardList, Dice5, Dumbbell, ExternalLink, RotateCcw, Save, Sparkles } from "lucide-react";
+import { toast } from "sonner";
+import { saveWorkoutLog, type ExerciseLog } from "@/lib/workoutStorage";
+import { useAuth } from "@/contexts/AuthContext";
 
 type RoutineType = "Full Body" | "Push" | "Pull" | "Legs";
 
@@ -289,7 +292,19 @@ function youtubeSearchUrl(exerciseName: string) {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${exerciseName} técnica ejercicio gimnasio`)}`;
 }
 
-function SessionTable({ session, formKey }: { session: Session; formKey: number }) {
+type ExerciseRow = { peso: string; series: string; reps: string; rir: string };
+
+function SessionTable({
+  session,
+  formKey,
+  rows,
+  onRowChange,
+}: {
+  session: Session;
+  formKey: number;
+  rows: ExerciseRow[];
+  onRowChange: (index: number, field: keyof ExerciseRow, value: string) => void;
+}) {
   const meta = TYPE_META[session.type];
 
   return (
@@ -337,10 +352,10 @@ function SessionTable({ session, formKey }: { session: Session; formKey: number 
                   </span>
                 </td>
                 <td className="description-cell">{exercise.description}</td>
-                <td><input aria-label={`Peso para ${exercise.name}`} placeholder="kg" /></td>
-                <td><input aria-label={`Series para ${exercise.name}`} placeholder="4" /></td>
-                <td><input aria-label={`Repeticiones para ${exercise.name}`} placeholder="8-12" /></td>
-                <td><input aria-label={`Nota para ${exercise.name}`} placeholder="RIR 1-2" /></td>
+                <td><input aria-label={`Peso para ${exercise.name}`} placeholder="kg" value={rows[index]?.peso ?? ""} onChange={(e) => onRowChange(index, "peso", e.target.value)} /></td>
+                <td><input aria-label={`Series para ${exercise.name}`} placeholder="4" value={rows[index]?.series ?? ""} onChange={(e) => onRowChange(index, "series", e.target.value)} /></td>
+                <td><input aria-label={`Repeticiones para ${exercise.name}`} placeholder="8-12" value={rows[index]?.reps ?? ""} onChange={(e) => onRowChange(index, "reps", e.target.value)} /></td>
+                <td><input aria-label={`Nota para ${exercise.name}`} placeholder="RIR 1-2" value={rows[index]?.rir ?? ""} onChange={(e) => onRowChange(index, "rir", e.target.value)} /></td>
               </tr>
             ))}
           </tbody>
@@ -350,11 +365,17 @@ function SessionTable({ session, formKey }: { session: Session; formKey: number 
   );
 }
 
+function emptyRows(count: number): ExerciseRow[] {
+  return Array.from({ length: count }, () => ({ peso: "", series: "", reps: "", rir: "" }));
+}
+
 export default function Home() {
+  const { currentUser } = useAuth();
   const [selected, setSelected] = useState<Session | null>(ROUTINES[0]);
   const [rolling, setRolling] = useState(false);
   const [formKey, setFormKey] = useState(0);
   const [history, setHistory] = useState<Session[]>([]);
+  const [rows, setRows] = useState<ExerciseRow[]>(() => emptyRows(ROUTINES[0].exercises.length));
 
   const stats = useMemo(() => {
     return [
@@ -369,6 +390,7 @@ export default function Home() {
     window.setTimeout(() => {
       const next = pickRandomSession(selected?.id);
       setSelected(next);
+      setRows(emptyRows(next.exercises.length));
       setFormKey((value) => value + 1);
       setHistory((items) => [next, ...items.filter((item) => item.id !== next.id)].slice(0, 5));
       setRolling(false);
@@ -379,11 +401,35 @@ export default function Home() {
     const options = ROUTINES.filter((session) => session.type === type);
     const next = options[Math.floor(Math.random() * options.length)];
     setSelected(next);
+    setRows(emptyRows(next.exercises.length));
     setFormKey((value) => value + 1);
     setHistory((items) => [next, ...items.filter((item) => item.id !== next.id)].slice(0, 5));
   };
 
-  const resetFields = () => setFormKey((value) => value + 1);
+  const resetFields = () => {
+    setFormKey((value) => value + 1);
+    if (selected) setRows(emptyRows(selected.exercises.length));
+  };
+
+  const handleRowChange = (index: number, field: keyof ExerciseRow, value: string) => {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
+  };
+
+  const handleSave = () => {
+    if (!selected) return;
+    const userId = currentUser ?? "anonymous";
+    const exercises: ExerciseLog[] = selected.exercises.map((ex, i) => ({
+      name: ex.name,
+      peso: rows[i]?.peso ?? "",
+      series: rows[i]?.series ?? "",
+      reps: rows[i]?.reps ?? "",
+      rir: rows[i]?.rir ?? "",
+    }));
+    saveWorkoutLog(userId, selected.id, selected.type, selected.day, selected.focus, exercises);
+    toast.success("Entrenamiento guardado", {
+      description: `${selected.type} · ${selected.day} — ${new Date().toLocaleDateString("es", { day: "2-digit", month: "short", year: "numeric" })}`,
+    });
+  };
 
   return (
     <main className="min-h-screen app-shell" style={{ backgroundImage: `linear-gradient(90deg, rgba(247,248,244,0.94), rgba(247,248,244,0.86)), url(${PAPER_URL})` }}>
@@ -437,11 +483,11 @@ export default function Home() {
             </div>
             <div className="action-row">
               <button onClick={resetFields} className="ghost-button"><RotateCcw size={17} /> Limpiar</button>
-              <button onClick={() => window.print()} className="ghost-button"><Printer size={17} /> Imprimir</button>
+              <button onClick={handleSave} className="ghost-button save-button" disabled={!selected}><Save size={17} /> Guardar entrenamiento</button>
             </div>
           </div>
 
-          {selected ? <SessionTable session={selected} formKey={formKey} /> : (
+          {selected ? <SessionTable session={selected} formKey={formKey} rows={rows} onRowChange={handleRowChange} /> : (
             <div className="empty-sheet">
               <ClipboardList size={44} />
               <p>Pulsa el dado para generar una sesión.</p>
